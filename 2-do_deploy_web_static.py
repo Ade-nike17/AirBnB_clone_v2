@@ -4,8 +4,8 @@ Fabric script (based on the file 1-pack_web_static.py) that distributes
 an archive to your web servers using the function do_deploy
 """
 
-from fabric.api import local, env, put, run
-from os import path
+from fabric.api import env, put, run
+from os.path import exists
 
 env.hosts = ['100.25.220.49', '18.206.192.41']
 env.user = 'ubuntu'
@@ -16,37 +16,40 @@ def do_deploy(archive_path):
     """
     Distributes an archive to the web servers
     """
-    if not path.exists(archive_path):
+    if not exists(archive_path):
         return False
 
     try:
         archive_name = archive_path.split('/')[-1]
-        archive_no_ext = archive_name.split('.')[0]
+        no_ext = archive_name.split('.')[0]
+        file_path = "/data/web_static/releases/"
 
         # Upload the archive to /tmp/ directory on the web servers
         put(archive_path, '/tmp/')
 
         # Uncompress the archive to /data/web_static/releases/<archive_no_ext>/
-        run('mkdir -p /data/web_static/releases/{}/'.format(archive_no_ext))
-        run('tar -xzf /tmp/{} -C /data/web_static/releases/{}/'
-                .format(archive_name, archive_no_ext))
+        run('sudo mkdir -p {}{}/'.format(file_path, no_ext))
+        run('sudo tar -xzf /tmp/{} -C {}{}/'
+            .format(archive_name, file_path, no_ext))
 
         # Delete the archive from the web servers
         run('sudo rm /tmp/{}'.format(archive_name))
 
-        run('sudo mv /data/web_static/releases/{}/web_static/* /data/web_static/releases/{}/'
-                .format(archive_no_ext, archive_no_ext))
+        # Move contents of web_static directory
+        run('sudo mv {0}{1}/web_static/* {0}{1}/'.format(file_path, no_ext))
 
         # Delete the symbolic links
-        run('sudo rm -rf /data/web_static/releases/{}/web_static'.format(archive_no_ext))
+        run('sudo rm -rf {}{}/web_static'.format(file_path, no_ext))
         run('sudo rm -rf /data/web_static/current')
 
         # Create a new symbolic link /data/web_static/current
-        run('sudo ln -s /data/web_static/releases/{}/ /data/web_static/current'
-                .format(archive_no_ext))
+        run('sudo ln -s {}{}/ /data/web_static/current'
+            .format(file_path, no_ext))
 
         print("New Version deployed!")
 
-        return True
-    except:
+    except Exception as e:
         return False
+
+    # On success
+    return True
